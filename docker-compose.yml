@@ -1,0 +1,50 @@
+name: blueharbor-lab
+
+services:
+
+  # aplicación web
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: blueharbor-web
+    hostname: blueharbor
+    ports:
+      - "80:80"       
+      - "2222:22"     
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET:  "secret"            
+      DB_HOST:     "db"
+      DB_PORT:     "5432"
+      DB_NAME:     "blueharbor"
+      DB_USER:     "blueharbor"
+      DB_PASSWORD: "Str0ng_DB_P4ss!"
+    networks:
+      - blueharbor-net
+    restart: unless-stopped
+
+  # base de datos
+  db:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    container_name: blueharbor-db
+    environment:
+      POSTGRES_DB:       "blueharbor"
+      POSTGRES_USER:     "blueharbor"
+      POSTGRES_PASSWORD: "Str0ng_DB_P4ss!"
+    networks:
+      - blueharbor-net
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U blueharbor -d blueharbor"]
+      interval: 5s
+      timeout:  5s
+      retries:  12
+    restart: unless-stopped
+
+networks:
+  blueharbor-net:
+    driver: bridge

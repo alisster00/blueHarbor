@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel — {{ company }}{% endblock %}
+
+{% block navbar %}
+<nav class="navbar">
+  <a class="navbar-brand" href="/admin">
+    <span class="logo-dot"></span> BlueHarbor Admin
+  </a>
+  <div class="navbar-right">
+    <span>{{ user }}</span>
+    <span class="badge badge-admin">Admin</span>
+    <!-- TODO: mover a env var el JWT_SECRET antes del release final -->
+    <a class="btn-logout" href="/logout">Sign out</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<style>
+  .report-output {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    font-family: monospace;
+    font-size: 13px;
+    color: #a8d0ff;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 60px;
+    display: none;
+  }
+  .report-output.visible { display: block; }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: .4rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .tab {
+    padding: .65rem 1.2rem;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab.active { color: var(--text); border-color: var(--accent); }
+  .tab-panel  { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+
+<div class="container">
+
+  <div style="margin-bottom:2rem;">
+    <h1 style="font-size:20px; font-weight:700;">Administration Panel</h1>
+    <p style="color:var(--text-muted); font-size:13px; margin-top:.3rem;">
+      Manage users, generate reports and monitor system activity.
+    </p>
+  </div>
+
+  <!-- Stats admin -->
+  <div class="grid-3" style="margin-bottom:1.5rem;">
+    <div class="stat-card">
+      <div class="stat-label">Total Users</div>
+      <div class="stat-value" id="stat-users">—</div>
+      <div class="stat-sub">Registered accounts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">API Version</div>
+      <div class="stat-value" style="font-size:20px;">v1.0</div>
+      <div class="stat-sub">BlueHarbor-API/1.0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Environment</div>
+      <div class="stat-value" style="font-size:20px;">PROD</div>
+      <div class="stat-sub" id="stat-debug">Checking...</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <div class="tab active" data-tab="users">Users</div>
+    <div class="tab"        data-tab="reports">Report Generator</div>
+    <div class="tab"        data-tab="system">System Info</div>
+  </div>
+
+  <!-- Tab: Users (no hace nada aún jsaksjksa)-->
+  <div class="tab-panel active" id="tab-users">
+    <div class="card">
+      <div class="card-header">System Users</div>
+      <table class="table" id="users-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Username</th><th>Email</th><th>Role</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          <tr><td colspan="4" style="color:var(--text-muted);">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Report Generator -->
+  <div class="tab-panel" id="tab-reports">
+    <div class="grid-2">
+
+      <div class="card">
+        <div class="card-header">Template Engine</div>
+
+        <div class="form-group">
+          <label class="form-label">Recipient</label>
+          <input
+            class="form-control"
+            type="text"
+            id="rpt-recipient"
+            placeholder="Ellen Joe"
+            value="Valued Customer"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Message Template</label>
+          <textarea
+            class="form-control"
+            id="rpt-template"
+            rows="6"
+            placeholder="Dear {{'{{'}}recipient{{'}}'}}, your shipment from {{'{{'}}company{{'}}'}} is on its way."
+          >Dear {{'{{'}}recipient{{'}}'}}, your shipment from {{'{{'}}company{{'}}'}} has arrived at our facility.</textarea>
+        </div>
+
+        <button class="btn btn-primary" id="rpt-send">
+          Generate Report
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Output</div>
+        <div class="report-output" id="rpt-output"></div>
+        <div id="rpt-placeholder" style="color:var(--text-muted); font-size:13px;">
+          The rendered report will appear here.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Tab: System Info — muestra info del health endpoint -->
+  <div class="tab-panel" id="tab-system">
+    <div class="card">
+      <div class="card-header">System Health</div>
+      <div id="system-info" class="code-block" style="margin-top:.5rem;">
+        Loading...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // helpers
+  const token = document.cookie.split(';')
+    .find(c => c.trim().startsWith('token='))
+    ?.split('=')[1] ?? '';
+
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab, .tab-panel').forEach(el => el.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+    });
+  });
+
+  // cargar usuarios 
+  async function loadUsers() {
+    try {
+      const r    = await fetch('/api/v1/admin/users', { headers: authHeaders });
+      const data = await r.json();
+      const tbody = document.getElementById('users-tbody');
+
+      document.getElementById('stat-users').textContent = data.users?.length ?? '—';
+
+      tbody.innerHTML = data.users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td><strong>${u.username}</strong></td>
+          <td>${u.email}</td>
+          <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-viewer'}">${u.role}</span></td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      document.getElementById('users-tbody').innerHTML =
+        '<tr><td colspan="4" style="color:var(--danger);">Error loading users</td></tr>';
+    }
+  }
+
+  // cargar health info
+  async function loadHealth() {
+    try {
+      const r    = await fetch('/api/v1/health');
+      const data = await r.json();
+
+      document.getElementById('stat-debug').textContent =
+        data.debug ? 'Debug mode ON' : 'Debug mode OFF';
+      document.getElementById('system-info').textContent =
+        JSON.stringify(data, null, 2);
+    } catch (e) {
+      document.getElementById('system-info').textContent = 'Error fetching health data.';
+    }
+  }
+
+  // generar reporte
+  document.getElementById('rpt-send').addEventListener('click', async () => {
+    const btn       = document.getElementById('rpt-send');
+    const output    = document.getElementById('rpt-output');
+    const holder    = document.getElementById('rpt-placeholder');
+    const template  = document.getElementById('rpt-template').value;
+    const recipient = document.getElementById('rpt-recipient').value;
+
+    btn.innerHTML = '<span class="spinner"></span> Generating...';
+    btn.disabled  = true;
+
+    try {
+      const r = await fetch('/api/v1/admin/report', {
+        method:  'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ template, recipient }),
+      });
+      const data = await r.json();
+
+      output.textContent = data.report ?? JSON.stringify(data, null, 2);
+      output.classList.add('visible');
+      holder.style.display = 'none';
+    } catch (e) {
+      output.textContent = `Error: ${e.message}`;
+      output.classList.add('visible');
+    } finally {
+      btn.innerHTML = 'Generate Report';
+      btn.disabled  = false;
+    }
+  });
+
+  // init
+  loadUsers();
+  loadHealth();
+</script>
+{% endblock %}

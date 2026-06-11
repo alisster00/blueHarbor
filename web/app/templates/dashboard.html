@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — {{ company }}{% endblock %}
+
+{% block navbar %}
+<nav class="navbar">
+  <a class="navbar-brand" href="/dashboard">
+    <span class="logo-dot"></span> BlueHarbor Portal
+  </a>
+  <div class="navbar-right">
+    <span>{{ user }}</span>
+    <span class="badge badge-viewer">Viewer</span>
+    <a class="btn-logout" href="/logout">Sign out</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="margin-bottom:2rem;">
+    <h1 style="font-size:20px; font-weight:700;">Welcome back, {{ user }}</h1>
+    <p style="color:var(--text-muted); font-size:13px; margin-top:.3rem;">
+      Shipment tracking overview for today.
+    </p>
+  </div>
+
+  <!-- stats -->
+  <div class="grid-3" style="margin-bottom:1.5rem;">
+    <div class="stat-card">
+      <div class="stat-label">Active Shipments</div>
+      <div class="stat-value">142</div>
+      <div class="stat-sub">↑ 12 from yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">In Transit</div>
+      <div class="stat-value">87</div>
+      <div class="stat-sub">Across 14 routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Delivered Today</div>
+      <div class="stat-value">55</div>
+      <div class="stat-sub">↑ 8% vs last week</div>
+    </div>
+  </div>
+
+  <!-- tabla de envíos recientes -->
+  <div class="card">
+    <div class="card-header">Recent Shipments</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Tracking ID</th>
+          <th>Origin</th>
+          <th>Destination</th>
+          <th>Status</th>
+          <th>ETA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>CN-20240115-0042</code></td>
+          <td>Madrid</td>
+          <td>Barcelona</td>
+          <td><span class="badge badge-viewer">In Transit</span></td>
+          <td>2024-01-16</td>
+        </tr>
+        <tr>
+          <td><code>CN-20240115-0039</code></td>
+          <td>Sevilla</td>
+          <td>Valencia</td>
+          <td><span class="badge badge-admin">Delivered</span></td>
+          <td>2024-01-15</td>
+        </tr>
+        <tr>
+          <td><code>CN-20240114-0091</code></td>
+          <td>Bilbao</td>
+          <td>Madrid</td>
+          <td><span class="badge badge-viewer">Processing</span></td>
+          <td>2024-01-17</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- acceso denegado a admin — pista de que existe un panel superior -->
+  <div style="margin-top:1.2rem;">
+    <div class="card" style="border-color: rgba(79,110,247,.3);">
+      <div style="display:flex; align-items:center; gap:.8rem;">
+        <div style="font-size:20px;">🔒</div>
+        <div>
+          <div style="font-weight:600; font-size:13px;">Admin Panel</div>
+          <div style="font-size:12px; color:var(--text-muted);">
+            Access restricted to administrators.
+            Contact <a href="mailto:admin@bharbor.dl" style="color:var(--accent);">admin@bharbor.dl</a> to request elevated privileges.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
