@@ -16,7 +16,7 @@ USERS = [
     },
     {
         "username": "omar",
-        "password": "DevOmar18!",
+        "password": "katherine",
         "role":     "viewer",
         "email":    "omar@bharbor.dl",
     },

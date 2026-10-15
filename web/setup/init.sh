@@ -8,12 +8,10 @@ fail() { echo "[!] $*" >&2; exit 1; }
 
 log "BlueHarbor Lab - Container starting..."
 
-usermod -s /bin/bash www-data 2>/dev/null || true
-
+# ── SSH ───────────────────────────────────────────────────────────────────────
 log "Starting SSH..."
 mkdir -p /var/run/sshd
 
-# regenerar host keys si no existen (primera ejecución)
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     ssh-keygen -A -q
 fi
@@ -21,15 +19,21 @@ fi
 /usr/sbin/sshd || fail "SSH failed to start"
 ok "SSH ready on port 22"
 
-# cron
+# ── Cron ──────────────────────────────────────────────────────────────────────
 log "Configuring cron..."
-/setup/cron_setup.sh
+/setup/cron_setup.sh || fail "cron_setup failed"
 
-# en imágenes slim no existe 'service'. Llamar al binario directamente.
 cron || fail "cron failed to start"
 ok "Cron ready"
 
-# esperar a PostgreSQL
+# ── Seed de logs ──────────────────────────────────────────────────────────────
+log "Seeding maintenance log..."
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] BlueHarbor maintenance subsystem initialized" \
+    > /var/log/blueharbor/system.log
+chown omar:omar /var/log/blueharbor/system.log
+ok "Maintenance log seeded"
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
 log "Waiting for PostgreSQL at ${DB_HOST:-db}:${DB_PORT:-5432}..."
 max_attempts=30
 attempt=0
@@ -47,23 +51,49 @@ do
 done
 ok "PostgreSQL ready"
 
-# iniciar base de datos
+# ── Seed de base de datos ─────────────────────────────────────────────────────
 log "Seeding database..."
-
 python3 /setup/setup_db.py || fail "Database seed failed"
 ok "Database ready"
 
-# nginx
+# ── .env ──────────────────────────────────────────────────────────────────────
+log "Generating application .env..."
+cat > /var/www/html/.env << 'EOF'
+# BlueHarbor Internal API - Environment Configuration
+# Last updated: 2024-01-15
+# TODO: move to Docker secrets before final release
+
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=blueharbor
+DB_USER=blueharbor
+DB_PASSWORD=Str0ng_DB_P4ss!
+JWT_SECRET=secret
+EOF
+chown www-data:www-data /var/www/html/.env
+chmod 640                /var/www/html/.env
+ok ".env generated"
+
+# ── Verificaciones de permisos ────────────────────────────────────────────────
+log "Verifying permissions..."
+[ "$(stat -c '%U:%a' /home/omar/user.txt)" = "omar:400" ] \
+    || fail "user.txt permissions wrong: $(stat -c '%U:%a' /home/omar/user.txt)"
+[ "$(stat -c '%U:%a' /root/root.txt)" = "root:400" ] \
+    || fail "root.txt permissions wrong: $(stat -c '%U:%a' /root/root.txt)"
+[ "$(stat -c '%U:%a' /var/log/blueharbor)" = "omar:775" ] \
+    || fail "/var/log/blueharbor permissions wrong: $(stat -c '%U:%a' /var/log/blueharbor)"
+[ "$(stat -c '%U:%a' /var/www/html/.env)" = "www-data:640" ] \
+    || fail ".env permissions wrong: $(stat -c '%U:%a' /var/www/html/.env)"
+ok "Permissions verified"
+
+# ── Nginx ─────────────────────────────────────────────────────────────────────
 log "Starting nginx..."
 
-# validar configuración antes de arrancar
 nginx -t 2>&1 || fail "nginx config invalid"
-
-# arrancar en segundo plano (sin daemon off - gunicorn será el proceso principal)
 nginx || fail "nginx failed to start"
 ok "nginx ready on port 80"
 
-# gunicorn / flask
+# ── Gunicorn ──────────────────────────────────────────────────────────────────
 log "Starting Flask/Gunicorn as www-data..."
 cd /var/www/html
 

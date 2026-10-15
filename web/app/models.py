@@ -1,3 +1,4 @@
+import hashlib
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -11,10 +12,12 @@ class User(db.Model):
     email         = db.Column(db.String(120), unique=True)
 
     def set_password(self, password: str) -> None:
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = hashlib.md5(password.encode("utf-8")).hexdigest()        
+        #self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
-        return check_password_hash(self.password_hash, password)
+        return self.password_hash == hashlib.md5(password.encode("utf-8")).hexdigest()        
+        #return check_password_hash(self.password_hash, password)
 
     def to_dict(self) -> dict:
         return {
