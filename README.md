@@ -1,14 +1,5 @@
 # BlueHarbor — Vulnerable Lab
 
-```
-  ██████╗ ██╗     ██╗   ██╗███████╗██╗  ██╗ █████╗ ██████╗ ██████╗  ██████╗ ██████╗
-  ██╔══██╗██║     ██║   ██║██╔════╝██║  ██║██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗
-  ██████╔╝██║     ██║   ██║█████╗  ███████║███████║██████╔╝██████╔╝██║   ██║██████╔╝
-  ██╔══██╗██║     ██║   ██║██╔══╝  ██╔══██║██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗
-  ██████╔╝███████╗╚██████╔╝███████╗██║  ██║██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║
-  ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝
-```
-
 ---
 
 ## Descripción
@@ -23,77 +14,7 @@ El objetivo es comprometer el sistema encadenando múltiples vulnerabilidades re
 |Sistema|Linux (Debian slim)|
 |Servicios|HTTP (80), SSH (2222)|
 |Flags|`user.txt`, `root.txt`|
-|Tiempo estimado|2 – 4 horas|
-
----
-
-## Vulnerabilidades incluidas
-
-### 1. Security Misconfiguration — A05 (OWASP 2021)
-
-**Descripción:** El endpoint `/api/v1/health` expone en producción información sensible del servidor: el flag `debug: true`, la versión exacta del stack y el `sys.path` completo de Python. El Swagger UI está accesible públicamente sin ningún tipo de autenticación.
-
-**Referencia:** CWE-200 (Exposure of Sensitive Information to an Unauthorized Actor)
-
----
-
-### 2. Broken Access Control — A01 (OWASP 2021)
-
-**Descripción:** El endpoint `/api/v1/auth/debug` fue creado para pruebas de integración y nunca fue desactivado en producción. Cualquier usuario anónimo puede consumirlo y obtener un token JWT firmado con la clave del servidor.
-
-**Referencia:** CWE-284 (Improper Access Control)
-
----
-
-### 3. Cryptographic Failures — A02 (OWASP 2021)
-
-**Descripción:** El token JWT devuelto por `/auth/debug` está firmado con el algoritmo HS256 usando una clave de baja entropía presente en wordlists comunes. Un atacante puede crackearla offline con `hashcat` y forjar un token con `role: admin`.
-
-**Referencias:**
-
-- CWE-326 (Inadequate Encryption Strength)
-- CWE-916 (Use of Password Hash With Insufficient Computational Effort)
-- [CVE-2015-9235](https://nvd.nist.gov/vuln/detail/CVE-2015-9235) — JWT `none` algorithm (variante relacionada)
-
----
-
-### 4. Injection / SSTI — A03 (OWASP 2021)
-
-**Descripción:** El endpoint `/api/v1/admin/report` acepta un campo `template` que es renderizado directamente con `render_template_string()` de Flask/Jinja2 sin ningún tipo de sanitización ni sandboxing. Permite RCE completo como el usuario `www-data`.
-
-**Payload de prueba:**
-
-```
-{"template": "{{7*7}}"}  →  {"report": "49"}
-```
-
-**Referencias:**
-
-- CWE-94 (Improper Control of Generation of Code)
-- CWE-1336 (Improper Neutralization of Special Elements in Template Engines)
-- [CVE-2019-8341](https://nvd.nist.gov/vuln/detail/CVE-2019-8341) — Jinja2 SSTI (variante en Ansible)
-
----
-
-### 5. Software & Data Integrity Failures — A08 (OWASP 2021)
-
-**Descripción:** El script `/home/omar/scripts/backup.py` importa `blueharbor_utils`, un módulo interno no distribuido por PyPI. La regla sudo permite pasar `PYTHONPATH` al intérprete, lo que posibilita plantar un módulo malicioso con el mismo nombre en `/tmp` y que sea cargado con prioridad sobre el legítimo.
-
-**Referencias:**
-
-- CWE-427 (Uncontrolled Search Path Element)
-- CWE-829 (Inclusion of Functionality from Untrusted Control Sphere)
-
----
-
-### 6. Escalada de privilegios — Tar Wildcard Injection
-
-**Descripción:** Un cron job ejecutado como `root` cada minuto comprime los logs con `tar czf /backup/logs.tar.gz *`. Al expandir el wildcard `*`, `tar` interpreta los nombres de archivo como argumentos propios. Un atacante con acceso de escritura al directorio de logs puede crear archivos con nombres como `--checkpoint-action=exec=sh privesc.sh` para ejecutar código como root.
-
-**Referencias:**
-
-- CWE-78 (OS Command Injection)
-- [GTFOBins — tar](https://gtfobins.github.io/gtfobins/tar/)
+|Tiempo estimado|30 min - 1 hora|
 
 ---
 
@@ -122,8 +43,8 @@ El objetivo es comprometer el sistema encadenando múltiples vulnerabilidades re
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/alisster00/blueHarbor-VulnLab.git
-cd blueHarbor-VulnLab
+git clone https://github.com/alisster00/blueHarbor.git
+cd blueHarbor
 ```
 
 ### 2. Construir e iniciar los contenedores
